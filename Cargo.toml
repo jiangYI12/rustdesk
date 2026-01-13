@@ -13,6 +13,10 @@ name = "librustdesk"
 crate-type = ["cdylib", "staticlib", "rlib"]
 
 [[bin]]
+name = "wegame"
+path = "src/main.rs"
+
+[[bin]]
 name = "naming"
 path = "src/naming.rs"
 
