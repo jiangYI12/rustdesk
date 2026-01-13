@@ -256,10 +256,10 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Build msi
-        if: env.UPLOAD_ARTIFACT == 'true'
+        if: false # Temporarily disabled for WeGame rename
         run: |
           pushd ./res/msi
-          python preprocess.py --arp -d ../../wegame --app-name WeGame
+          python preprocess.py --arp -d ../../wegame --app-name WeGame -v ${{ env.VERSION }}
           nuget restore msi.sln
           msbuild msi.sln -p:Configuration=Release -p:Platform=x64 /p:TargetVersion=Windows10
           mv ./Package/bin/x64/Release/en-us/Package.msi ../../SignOutput/wegame-${{ env.VERSION }}-${{ matrix.job.arch }}.msi
