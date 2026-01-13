@@ -2488,7 +2488,7 @@ Widget _Radio<T>(BuildContext context,
     {required T value,
     required T groupValue,
     required String label,
-    Function(T value)? onChanged,
+    dynamic Function(T value)? onChanged,
     bool autoNewLine = true}) {
   final onChange2 = onChanged != null
       ? (T? value) {
