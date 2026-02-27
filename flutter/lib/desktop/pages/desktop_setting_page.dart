@@ -1517,7 +1517,7 @@ class _Network extends StatefulWidget {
 class _NetworkState extends State<_Network> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-  bool locked = !isWeb && bind.mainIsInstalled();
+  bool locked = false;  // 默认解锁网络设置
 
   final scrollController = ScrollController();
 
