@@ -154,6 +154,9 @@ fn init_network_defaults() {
         Config::set_option("allow-insecure-tls-fallback".to_string(), "Y".to_string());
     }
     
+    // 注释掉自定义服务器设置，使用默认的公共服务器
+    // 如果需要自定义服务器，用户可以在 UI 中手动设置
+    /*
     // 设置自定义服务器（如果未设置）
     if Config::get_option("custom-rendezvous-server").is_empty() {
         Config::set_option("custom-rendezvous-server".to_string(), "47.118.17.9".to_string());
@@ -168,6 +171,7 @@ fn init_network_defaults() {
     if Config::get_option("key").is_empty() {
         Config::set_option("key".to_string(), "kw2fdH06BbkQhDQT6HWv1yXXinGbPB71bp+MEUBhLFo=".to_string());
     }
+    */
     
     // 强制启动服务（每次启动都设置，确保服务始终运行）
     Config::set_option("stop-service".to_string(), "N".to_string());
