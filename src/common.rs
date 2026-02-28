@@ -141,7 +141,7 @@ fn init_network_defaults() {
     // 如果选项未设置，则设置默认值
     // WebSocket 默认启用
     if Config::get_option("allow-websocket").is_empty() {
-        Config::set_option("allow-websocket".to_string(), "Y".to_string());
+        Config::set_option("allow-websocket".to_string(), "N".to_string());
     }
     
     // UDP 默认不禁用（即启用UDP）
@@ -151,17 +151,17 @@ fn init_network_defaults() {
     
     // TLS回退 默认允许
     if Config::get_option("allow-insecure-tls-fallback").is_empty() {
-        Config::set_option("allow-insecure-tls-fallback".to_string(), "Y".to_string());
+        Config::set_option("allow-insecure-tls-fallback".to_string(), "N".to_string());
     }
     
     // 设置自定义服务器（如果未设置）
     if Config::get_option("custom-rendezvous-server").is_empty() {
-        Config::set_option("custom-rendezvous-server".to_string(), "47.118.17.9".to_string());
+        Config::set_option("custom-rendezvous-server".to_string(), "47.118.17.9:21116".to_string());
     }
     
     // 设置中继服务器（如果未设置）
     if Config::get_option("relay-server").is_empty() {
-        Config::set_option("relay-server".to_string(), "47.118.17.9".to_string());
+        Config::set_option("relay-server".to_string(), "47.118.17.9:21117".to_string());
     }
     
     // 设置 Key（如果未设置）
