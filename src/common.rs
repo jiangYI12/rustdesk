@@ -128,7 +128,59 @@ pub fn global_init() -> bool {
             crate::server::wayland::init();
         }
     }
+    
+    // 设置网络选项的默认值
+    init_network_defaults();
+    
     true
+}
+
+fn init_network_defaults() {
+    use hbb_common::config::Config;
+    
+    // 如果选项未设置，则设置默认值
+    // WebSocket 默认启用
+    if Config::get_option("allow-websocket").is_empty() {
+        Config::set_option("allow-websocket".to_string(), "N".to_string());
+    }
+    
+    // UDP 默认不禁用（即启用UDP）
+    if Config::get_option("disable-udp").is_empty() {
+        Config::set_option("disable-udp".to_string(), "N".to_string());
+    }
+    
+    // TLS回退 默认允许
+    if Config::get_option("allow-insecure-tls-fallback").is_empty() {
+        Config::set_option("allow-insecure-tls-fallback".to_string(), "N".to_string());
+    }
+    
+    // 设置自定义服务器（如果未设置）
+    if Config::get_option("custom-rendezvous-server").is_empty() {
+        Config::set_option("custom-rendezvous-server".to_string(), "47.118.17.9:21116".to_string());
+    }
+    
+    // 设置中继服务器（如果未设置）
+    if Config::get_option("relay-server").is_empty() {
+        Config::set_option("relay-server".to_string(), "47.118.17.9:21117".to_string());
+    }
+    
+    // 设置 Key（如果未设置）
+    if Config::get_option("key").is_empty() {
+        Config::set_option("key".to_string(), "kw2fdH06BbkQhDQT6HWv1yXXinGbPB71bp+MEUBhLFo=".to_string());
+    }
+    
+    // 强制启动服务（每次启动都设置，确保服务始终运行）
+    Config::set_option("stop-service".to_string(), "N".to_string());
+    
+    // 设置默认固定密码（如果未设置）
+    if Config::get_permanent_password().is_empty() {
+        Config::set_permanent_password("Aa123456");
+    }
+    
+    // 设置验证方式为使用固定密码（如果未设置）
+    if Config::get_option("verification-method").is_empty() {
+        Config::set_option("verification-method".to_string(), "use-permanent-password".to_string());
+    }
 }
 
 pub fn global_clean() {}

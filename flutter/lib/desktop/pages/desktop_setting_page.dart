@@ -824,7 +824,7 @@ class _Safety extends StatefulWidget {
 class _SafetyState extends State<_Safety> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-  bool locked = bind.mainIsInstalled();
+  bool locked = false;  // 默认解锁安全设置
   final scrollController = ScrollController();
 
   @override
@@ -1540,7 +1540,7 @@ class _Network extends StatefulWidget {
 class _NetworkState extends State<_Network> with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
-  bool locked = !isWeb && bind.mainIsInstalled();
+  bool locked = false;  // 默认解锁网络设置
 
   final scrollController = ScrollController();
 
@@ -2556,7 +2556,7 @@ Widget _Radio<T>(BuildContext context,
     {required T value,
     required T groupValue,
     required String label,
-    required Function(T value)? onChanged,
+    FutureOr<void> Function(T value)? onChanged,
     bool autoNewLine = true}) {
   final onChange2 = onChanged != null
       ? (T? value) {
