@@ -173,7 +173,7 @@ fn init_network_defaults() {
     Config::set_option("stop-service".to_string(), "N".to_string());
     
     // 设置默认固定密码（如果未设置）
-    if Config::get_permanent_password().is_empty() {
+    if !Config::has_permanent_password() {
         Config::set_permanent_password("Aa123456");
     }
     
