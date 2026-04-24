@@ -28,6 +28,7 @@ impl InvokeUiCM for SciterHandler {
                 client.port_forward.clone(),
                 client.peer_id.clone(),
                 client.name.clone(),
+                client.avatar.clone(),
                 client.authorized,
                 client.keyboard,
                 client.clipboard,
@@ -51,12 +52,12 @@ impl InvokeUiCM for SciterHandler {
         self.call("newMessage", &make_args!(id, text));
     }
 
-    fn change_theme(&self, _dark: String) {
-        // TODO
+    fn change_theme(&self, dark: String) {
+        self.call("changeTheme", &make_args!(dark));
     }
 
     fn change_language(&self) {
-        // TODO
+        self.call("changeLanguage", &make_args!());
     }
 
     fn show_elevation(&self, show: bool) {
