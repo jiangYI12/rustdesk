@@ -3231,17 +3231,27 @@ impl Connection {
                             #[cfg(windows)]
                             {
                                 use std::os::windows::process::CommandExt;
-                                let _ = std::process::Command::new("powershell")
-                                    .args(&[
-                                        "-NoProfile",
-                                        "-Command",
-                                        &format!(
-                                            "Start-Sleep -Seconds 3; Start-Process '{}'",
-                                            exe_str
-                                        ),
-                                    ])
-                                    .creation_flags(0x08000000 /* CREATE_NO_WINDOW */)
-                                    .spawn();
+                                let tmp = std::env::temp_dir().join("rustdesk_restart.bat");
+                                let bat = format!(
+                                    "@echo off\r\n\
+                                     :wait\r\n\
+                                     tasklist /FI \"PID eq {}\" 2>nul | find \"{}\" >nul\r\n\
+                                     if not errorlevel 1 (\r\n\
+                                         timeout /t 1 /nobreak >nul\r\n\
+                                         goto wait\r\n\
+                                     )\r\n\
+                                     start \"\" \"{}\"\r\n\
+                                     del \"%~f0\"\r\n",
+                                    std::process::id(),
+                                    std::process::id(),
+                                    exe_str,
+                                );
+                                if std::fs::write(&tmp, &bat).is_ok() {
+                                    let _ = std::process::Command::new("cmd")
+                                        .args(&["/C", &tmp.to_string_lossy().to_string()])
+                                        .creation_flags(0x08000200 /* CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP */)
+                                        .spawn();
+                                }
                             }
                             #[cfg(not(windows))]
                             {
