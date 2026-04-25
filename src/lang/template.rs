@@ -36,6 +36,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Invalid server configuration", ""),
         ("Clipboard is empty", ""),
         ("Stop service", ""),
+        ("Restart remote service", ""),
         ("Change ID", ""),
         ("Your new ID", ""),
         ("length %min% to %max%", ""),

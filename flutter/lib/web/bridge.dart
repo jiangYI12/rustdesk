@@ -1283,6 +1283,11 @@ class RustdeskImpl {
     return Future(() => js.context.callMethod('setByName', ['restart']));
   }
 
+  Future<void> sessionRestartRemoteService(
+      {required UuidValue sessionId, dynamic hint}) {
+    throw UnimplementedError("sessionRestartRemoteService");
+  }
+
   String sessionGetAuditServerSync(
       {required UuidValue sessionId, required String typ, dynamic hint}) {
     return js.context.callMethod('getByName', ['audit_server', typ]);

@@ -303,6 +303,23 @@ class _ConnectionTabPageState extends State<ConnectionTabPage> {
       ));
     }
 
+    if (pi.platform == kPeerPlatformLinux ||
+        pi.platform == kPeerPlatformWindows ||
+        pi.platform == kPeerPlatformMacOS) {
+      menu.add(MenuEntryButton<String>(
+        childBuilder: (TextStyle? style) => Text(
+          translate('Restart remote service'),
+          style: style,
+        ),
+        proc: () {
+          bind.sessionRestartRemoteService(sessionId: sessionId);
+        },
+        padding: padding,
+        dismissOnClicked: true,
+        dismissCallback: cancelFunc,
+      ));
+    }
+
     if (perms['keyboard'] != false && !ffi.ffiModel.viewOnly) {
       menu.add(RemoteMenuEntry.insertLock(sessionId, padding,
           dismissFunc: cancelFunc));

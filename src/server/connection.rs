@@ -3222,6 +3222,14 @@ impl Connection {
                             }
                         }
                     }
+                    Some(misc::Union::RestartRemoteService(_)) => {
+                        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                        {
+                            log::info!("Restart RustDesk service by the peer");
+                            crate::run_me::<&str>(vec![]).ok();
+                            std::process::exit(0);
+                        }
+                    }
                     #[cfg(windows)]
                     Some(misc::Union::ElevationRequest(r)) => match r.union {
                         Some(elevation_request::Union::Direct(_)) => {

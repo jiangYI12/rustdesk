@@ -559,6 +559,12 @@ impl<T: InvokeUiSession> Session<T> {
         self.send(Data::Message(msg));
     }
 
+    pub fn restart_remote_service(&self) {
+        let lc = self.lc.read().unwrap();
+        let msg = lc.restart_remote_service();
+        self.send(Data::Message(msg));
+    }
+
     #[cfg(all(feature = "flutter", feature = "plugin_framework"))]
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     pub fn send_plugin_request(&self, request: PluginRequest) {

@@ -36,6 +36,7 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Invalid server configuration", "無效的伺服器設定"),
         ("Clipboard is empty", "剪貼簿是空的"),
         ("Stop service", "停止服務"),
+        ("Restart remote service", "重啟遠端服務"),
         ("Change ID", "更改 ID"),
         ("Your new ID", "您的新 ID"),
         ("length %min% to %max%", "長度在 %min% 與 %max% 之間"),

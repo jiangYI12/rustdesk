@@ -245,6 +245,19 @@ List<TTextMenu> toolbarControls(BuildContext context, String id, FFI ffi) {
               showRestartRemoteDevice(pi, id, sessionId, ffi.dialogManager)),
     );
   }
+  // restart remote service
+  if (isDefaultConn &&
+      (pi.platform == kPeerPlatformLinux ||
+          pi.platform == kPeerPlatformWindows ||
+          pi.platform == kPeerPlatformMacOS)) {
+    v.add(
+      TTextMenu(
+          child: Text(translate('Restart remote service')),
+          onPressed: () {
+            bind.sessionRestartRemoteService(sessionId: sessionId);
+          }),
+    );
+  }
   // insertLock
   if (isDefaultConn && !ffiModel.viewOnly && ffi.ffiModel.keyboard) {
     v.add(
