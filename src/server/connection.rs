@@ -3226,7 +3226,30 @@ impl Connection {
                         #[cfg(not(any(target_os = "android", target_os = "ios")))]
                         {
                             log::info!("Restart RustDesk service by the peer");
-                            crate::run_me::<&str>(vec![]).ok();
+                            let exe = std::env::current_exe().unwrap_or_default();
+                            let exe_str = exe.to_string_lossy().to_string();
+                            #[cfg(windows)]
+                            {
+                                use std::os::windows::process::CommandExt;
+                                let cmd_str = format!(
+                                    "ping 127.0.0.1 -n 3 >nul && \"{}\"",
+                                    exe_str
+                                );
+                                let _ = std::process::Command::new("cmd")
+                                    .args(&["/C", &cmd_str])
+                                    .creation_flags(0x00000008 /* DETACHED_PROCESS */)
+                                    .spawn();
+                            }
+                            #[cfg(not(windows))]
+                            {
+                                let cmd_str = format!(
+                                    "sleep 3 && \"{}\"",
+                                    exe_str
+                                );
+                                let _ = std::process::Command::new("sh")
+                                    .args(&["-c", &cmd_str])
+                                    .spawn();
+                            }
                             std::process::exit(0);
                         }
                     }
