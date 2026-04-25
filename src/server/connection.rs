@@ -3231,13 +3231,16 @@ impl Connection {
                             #[cfg(windows)]
                             {
                                 use std::os::windows::process::CommandExt;
-                                let cmd_str = format!(
-                                    "ping 127.0.0.1 -n 3 >nul && \"{}\"",
-                                    exe_str
-                                );
-                                let _ = std::process::Command::new("cmd")
-                                    .args(&["/C", &cmd_str])
-                                    .creation_flags(0x00000008 /* DETACHED_PROCESS */)
+                                let _ = std::process::Command::new("powershell")
+                                    .args(&[
+                                        "-NoProfile",
+                                        "-Command",
+                                        &format!(
+                                            "Start-Sleep -Seconds 3; Start-Process '{}'",
+                                            exe_str
+                                        ),
+                                    ])
+                                    .creation_flags(0x08000000 /* CREATE_NO_WINDOW */)
                                     .spawn();
                             }
                             #[cfg(not(windows))]
