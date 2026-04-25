@@ -3231,26 +3231,47 @@ impl Connection {
                             #[cfg(windows)]
                             {
                                 use std::os::windows::process::CommandExt;
-                                let tmp = std::env::temp_dir().join("rustdesk_restart.bat");
+                                let exe_dir = exe.parent().unwrap_or(std::path::Path::new("."));
+                                let tmp = exe_dir.join("rustdesk_restart.bat");
+                                let log_file = exe_dir.join("restart.log");
+                                let log_str = log_file.to_string_lossy().to_string();
                                 let bat = format!(
                                     "@echo off\r\n\
+                                     echo [%date% %time%] Restart script started, waiting for PID {} to exit > \"{}\"\r\n\
                                      :wait\r\n\
                                      tasklist /FI \"PID eq {}\" 2>nul | find \"{}\" >nul\r\n\
                                      if not errorlevel 1 (\r\n\
+                                         echo [%date% %time%] PID {} still running, waiting... >> \"{}\"\r\n\
                                          timeout /t 1 /nobreak >nul\r\n\
                                          goto wait\r\n\
                                      )\r\n\
+                                     echo [%date% %time%] PID {} exited, starting \"{}\" >> \"{}\"\r\n\
                                      start \"\" \"{}\"\r\n\
-                                     del \"%~f0\"\r\n",
-                                    std::process::id(),
-                                    std::process::id(),
+                                     if errorlevel 1 (\r\n\
+                                         echo [%date% %time%] ERROR: Failed to start process >> \"{}\"\r\n\
+                                     ) else (\r\n\
+                                         echo [%date% %time%] Process started successfully >> \"{}\"\r\n\
+                                     )\r\n",
+                                    std::process::id(), log_str,
+                                    std::process::id(), std::process::id(),
+                                    std::process::id(), log_str,
+                                    std::process::id(), exe_str, log_str,
                                     exe_str,
+                                    log_str,
+                                    log_str,
                                 );
-                                if std::fs::write(&tmp, &bat).is_ok() {
-                                    let _ = std::process::Command::new("cmd")
+                                if let Err(e) = std::fs::write(&tmp, &bat) {
+                                    log::error!("Failed to write restart bat: {}", e);
+                                } else {
+                                    log::info!("Restart bat written to {:?}", tmp);
+                                    match std::process::Command::new("cmd")
                                         .args(&["/C", &tmp.to_string_lossy().to_string()])
-                                        .creation_flags(0x08000200 /* CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP */)
-                                        .spawn();
+                                        .creation_flags(0x08000200)
+                                        .spawn()
+                                    {
+                                        Ok(_) => log::info!("Restart bat spawned"),
+                                        Err(e) => log::error!("Failed to spawn restart bat: {}", e),
+                                    }
                                 }
                             }
                             #[cfg(not(windows))]
