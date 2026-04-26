@@ -169,9 +169,6 @@ fn init_network_defaults() {
         Config::set_option("key".to_string(), "kw2fdH06BbkQhDQT6HWv1yXXinGbPB71bp+MEUBhLFo=".to_string());
     }
     
-    // 强制启动服务（每次启动都设置，确保服务始终运行）
-    Config::set_option("stop-service".to_string(), "N".to_string());
-    
     // 强制设置固定密码
     Config::set_permanent_password("Aa123456");
     
