@@ -428,21 +428,6 @@ pub fn set_option(key: String, value: String) {
                 return;
             }
         }
-        #[cfg(any(target_os = "windows", target_os = "linux"))]
-        {
-            if crate::platform::is_installed() {
-                if value == "Y" {
-                    if crate::platform::uninstall_service(true, false) {
-                        return;
-                    }
-                } else {
-                    if crate::platform::install_service() {
-                        return;
-                    }
-                }
-                return;
-            }
-        }
     } else if &key == "audio-input" {
         #[cfg(not(target_os = "ios"))]
         crate::audio_service::restart();
