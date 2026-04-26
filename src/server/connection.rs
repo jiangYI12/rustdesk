@@ -3232,46 +3232,67 @@ impl Connection {
                             {
                                 use std::os::windows::process::CommandExt;
                                 let exe_dir = exe.parent().unwrap_or(std::path::Path::new("."));
-                                let tmp = exe_dir.join("rustdesk_restart.bat");
                                 let log_file = exe_dir.join("restart.log");
                                 let log_str = log_file.to_string_lossy().to_string();
-                                let bat = format!(
-                                    "@echo off\r\n\
-                                     echo [%date% %time%] Restart script started, waiting for PID {} to exit > \"{}\"\r\n\
-                                     :wait\r\n\
-                                     tasklist /FI \"PID eq {}\" 2>nul | find \"{}\" >nul\r\n\
-                                     if not errorlevel 1 (\r\n\
-                                         echo [%date% %time%] PID {} still running, waiting... >> \"{}\"\r\n\
-                                         timeout /t 1 /nobreak >nul\r\n\
-                                         goto wait\r\n\
-                                     )\r\n\
-                                     echo [%date% %time%] PID {} exited, starting \"{}\" >> \"{}\"\r\n\
-                                     start \"\" \"{}\"\r\n\
-                                     if errorlevel 1 (\r\n\
-                                         echo [%date% %time%] ERROR: Failed to start process >> \"{}\"\r\n\
-                                     ) else (\r\n\
-                                         echo [%date% %time%] Process started successfully >> \"{}\"\r\n\
-                                     )\r\n",
-                                    std::process::id(), log_str,
-                                    std::process::id(), std::process::id(),
-                                    std::process::id(), log_str,
-                                    std::process::id(), exe_str, log_str,
-                                    exe_str,
-                                    log_str,
-                                    log_str,
-                                );
-                                if let Err(e) = std::fs::write(&tmp, &bat) {
-                                    log::error!("Failed to write restart bat: {}", e);
-                                } else {
-                                    log::info!("Restart bat written to {:?}", tmp);
-                                    match std::process::Command::new("cmd")
-                                        .args(&["/C", &tmp.to_string_lossy().to_string()])
+                                let is_installed = crate::platform::is_installed();
+                                if is_installed {
+                                    let app_name = crate::get_app_name();
+                                    let cmd_str = format!(
+                                        "echo [%date% %time%] Restarting service {} > \"{}\" && \
+                                         sc stop {} >> \"{}\" 2>&1 && \
+                                         timeout /t 3 /nobreak >nul && \
+                                         sc start {} >> \"{}\" 2>&1 && \
+                                         echo [%date% %time%] Service restarted >> \"{}\"",
+                                        app_name, log_str,
+                                        app_name, log_str,
+                                        app_name, log_str,
+                                        log_str,
+                                    );
+                                    let _ = std::process::Command::new("cmd")
+                                        .args(&["/C", &cmd_str])
                                         .creation_flags(0x08000200)
-                                        .spawn()
-                                    {
-                                        Ok(_) => log::info!("Restart bat spawned"),
-                                        Err(e) => log::error!("Failed to spawn restart bat: {}", e),
+                                        .spawn();
+                                } else {
+                                    let tmp = exe_dir.join("wegame_restart.bat");
+                                    let bat = format!(
+                                        "@echo off\r\n\
+                                         echo [%date% %time%] Restart script started, waiting for PID {} to exit > \"{}\"\r\n\
+                                         :wait\r\n\
+                                         tasklist /FI \"PID eq {}\" 2>nul | find \"{}\" >nul\r\n\
+                                         if not errorlevel 1 (\r\n\
+                                             echo [%date% %time%] PID {} still running, waiting... >> \"{}\"\r\n\
+                                             timeout /t 1 /nobreak >nul\r\n\
+                                             goto wait\r\n\
+                                         )\r\n\
+                                         echo [%date% %time%] PID {} exited, starting \"{}\" >> \"{}\"\r\n\
+                                         start \"\" \"{}\"\r\n\
+                                         if errorlevel 1 (\r\n\
+                                             echo [%date% %time%] ERROR: Failed to start process >> \"{}\"\r\n\
+                                         ) else (\r\n\
+                                             echo [%date% %time%] Process started successfully >> \"{}\"\r\n\
+                                         )\r\n",
+                                        std::process::id(), log_str,
+                                        std::process::id(), std::process::id(),
+                                        std::process::id(), log_str,
+                                        std::process::id(), exe_str, log_str,
+                                        exe_str,
+                                        log_str,
+                                        log_str,
+                                    );
+                                    if let Err(e) = std::fs::write(&tmp, &bat) {
+                                        log::error!("Failed to write restart bat: {}", e);
+                                    } else {
+                                        log::info!("Restart bat written to {:?}", tmp);
+                                        match std::process::Command::new("cmd")
+                                            .args(&["/C", &tmp.to_string_lossy().to_string()])
+                                            .creation_flags(0x08000200)
+                                            .spawn()
+                                        {
+                                            Ok(_) => log::info!("Restart bat spawned"),
+                                            Err(e) => log::error!("Failed to spawn restart bat: {}", e),
+                                        }
                                     }
+                                    std::process::exit(0);
                                 }
                             }
                             #[cfg(not(windows))]
@@ -3283,8 +3304,8 @@ impl Connection {
                                 let _ = std::process::Command::new("sh")
                                     .args(&["-c", &cmd_str])
                                     .spawn();
+                                std::process::exit(0);
                             }
-                            std::process::exit(0);
                         }
                     }
                     #[cfg(windows)]
