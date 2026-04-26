@@ -428,6 +428,33 @@ pub fn set_option(key: String, value: String) {
                 return;
             }
         }
+        #[cfg(target_os = "windows")]
+        {
+            if crate::platform::is_installed() {
+                let app_name = crate::get_app_name();
+                let exe = std::env::current_exe().unwrap_or_default();
+                let exe_dir = exe.parent().unwrap_or(std::path::Path::new("."));
+                let log_file = exe_dir.join("restart.log");
+                let log_str = log_file.to_string_lossy().to_string();
+                let cmd_str = format!(
+                    "echo [%date% %time%] Restarting service {} > \"{}\" && \
+                     sc stop {} >> \"{}\" 2>&1 && \
+                     timeout /t 3 /nobreak >nul && \
+                     sc start {} >> \"{}\" 2>&1 && \
+                     echo [%date% %time%] Service restarted >> \"{}\"",
+                    app_name, log_str,
+                    app_name, log_str,
+                    app_name, log_str,
+                    log_str,
+                );
+                use std::os::windows::process::CommandExt;
+                let _ = std::process::Command::new("cmd")
+                    .args(&["/C", &cmd_str])
+                    .creation_flags(0x08000200)
+                    .spawn();
+                return;
+            }
+        }
     } else if &key == "audio-input" {
         #[cfg(not(target_os = "ios"))]
         crate::audio_service::restart();
