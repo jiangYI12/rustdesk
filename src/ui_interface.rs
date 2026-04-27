@@ -436,22 +436,30 @@ pub fn set_option(key: String, value: String) {
                 let exe_dir = exe.parent().unwrap_or(std::path::Path::new("."));
                 let log_file = exe_dir.join("restart.log");
                 let log_str = log_file.to_string_lossy().to_string();
-                let cmd_str = format!(
-                    "echo [%date% %time%] Restarting service {} > \"{}\" && \
-                     sc stop {} >> \"{}\" 2>&1 && \
-                     timeout /t 3 /nobreak >nul && \
-                     sc start {} >> \"{}\" 2>&1 && \
-                     echo [%date% %time%] Service restarted >> \"{}\"",
+                let tmp = exe_dir.join("wegame_restart.bat");
+                let bat = format!(
+                    "@echo off\r\n\
+                     echo [%date% %time%] Restart from UI (stop-service) > \"{}\"\r\n\
+                     sc stop {} >> \"{}\" 2>&1\r\n\
+                     echo [%date% %time%] sc stop returned %%errorlevel%% >> \"{}\"\r\n\
+                     timeout /t 3 /nobreak >nul\r\n\
+                     sc start {} >> \"{}\" 2>&1\r\n\
+                     echo [%date% %time%] sc start returned %%errorlevel%% >> \"{}\"\r\n",
+                    log_str,
                     app_name, log_str,
-                    app_name, log_str,
+                    log_str,
                     app_name, log_str,
                     log_str,
                 );
-                use std::os::windows::process::CommandExt;
-                let _ = std::process::Command::new("cmd")
-                    .args(&["/C", &cmd_str])
-                    .creation_flags(0x08000200)
-                    .spawn();
+                if let Ok(()) = std::fs::write(&tmp, &bat) {
+                    use std::os::windows::process::CommandExt;
+                    const DETACHED: u32 = 0x00000008;
+                    const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
+                    let _ = std::process::Command::new("cmd")
+                        .args(&["/C", &tmp.to_string_lossy().to_string()])
+                        .creation_flags(DETACHED | CREATE_NEW_PROCESS_GROUP)
+                        .spawn();
+                }
                 return;
             }
         }
