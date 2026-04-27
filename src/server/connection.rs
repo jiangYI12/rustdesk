@@ -3240,12 +3240,13 @@ impl Connection {
                                 let bat = if is_installed {
                                     format!(
                                         "@echo off\r\n\
-                                         echo [%date% %time%] Restart script started (installed mode, service={}) > \"{}\"\r\n\
+                                         echo [%date% %time%] Restart script started (installed, service={}) > \"{}\"\r\n\
                                          sc stop {} >> \"{}\" 2>&1\r\n\
                                          echo [%date% %time%] sc stop returned %errorlevel% >> \"{}\"\r\n\
-                                         timeout /t 3 /nobreak >nul\r\n\
+                                         ping 127.0.0.1 -n 4 >nul\r\n\
                                          sc start {} >> \"{}\" 2>&1\r\n\
-                                         echo [%date% %time%] sc start returned %errorlevel% >> \"{}\"\r\n",
+                                         echo [%date% %time%] sc start returned %errorlevel% >> \"{}\"\r\n\
+                                         schtasks /delete /tn wegame_restart /f >nul 2>&1\r\n",
                                         app_name, log_str,
                                         app_name, log_str,
                                         log_str,
@@ -3255,16 +3256,17 @@ impl Connection {
                                 } else {
                                     format!(
                                         "@echo off\r\n\
-                                         echo [%date% %time%] Restart script started (portable mode, PID={}) > \"{}\"\r\n\
+                                         echo [%date% %time%] Restart script started (portable, PID={}) > \"{}\"\r\n\
                                          :wait\r\n\
                                          tasklist /FI \"PID eq {}\" 2>nul | find \"{}\" >nul\r\n\
                                          if not errorlevel 1 (\r\n\
-                                             timeout /t 1 /nobreak >nul\r\n\
+                                             ping 127.0.0.1 -n 2 >nul\r\n\
                                              goto wait\r\n\
                                          )\r\n\
                                          echo [%date% %time%] PID exited, starting >> \"{}\"\r\n\
                                          start \"\" \"{}\"\r\n\
-                                         echo [%date% %time%] start returned %errorlevel% >> \"{}\"\r\n",
+                                         echo [%date% %time%] start returned %errorlevel% >> \"{}\"\r\n\
+                                         schtasks /delete /tn wegame_restart /f >nul 2>&1\r\n",
                                         std::process::id(), log_str,
                                         std::process::id(), std::process::id(),
                                         log_str,
@@ -3275,16 +3277,27 @@ impl Connection {
                                 if let Err(e) = std::fs::write(&tmp, &bat) {
                                     log::error!("Failed to write restart bat: {}", e);
                                 } else {
-                                    log::info!("Restart bat written to {:?}, installed={}", tmp, is_installed);
-                                    const DETACHED: u32 = 0x00000008;
-                                    const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
-                                    match std::process::Command::new("cmd")
-                                        .args(&["/C", &tmp.to_string_lossy().to_string()])
-                                        .creation_flags(DETACHED | CREATE_NEW_PROCESS_GROUP)
-                                        .spawn()
+                                    let tmp_str = tmp.to_string_lossy().to_string();
+                                    log::info!("Restart bat written to {}, installed={}", tmp_str, is_installed);
+                                    let _ = std::process::Command::new("schtasks")
+                                        .args(&[
+                                            "/create", "/tn", "wegame_restart",
+                                            "/tr", &tmp_str,
+                                            "/sc", "once",
+                                            "/st", "00:00",
+                                            "/f",
+                                            "/ru", "SYSTEM",
+                                            "/rl", "HIGHEST",
+                                        ])
+                                        .creation_flags(0x08000000)
+                                        .output();
+                                    match std::process::Command::new("schtasks")
+                                        .args(&["/run", "/tn", "wegame_restart"])
+                                        .creation_flags(0x08000000)
+                                        .output()
                                     {
-                                        Ok(_) => log::info!("Restart bat spawned"),
-                                        Err(e) => log::error!("Failed to spawn restart bat: {}", e),
+                                        Ok(o) => log::info!("schtasks /run: {}", String::from_utf8_lossy(&o.stdout)),
+                                        Err(e) => log::error!("schtasks /run failed: {}", e),
                                     }
                                 }
                                 if !is_installed {
