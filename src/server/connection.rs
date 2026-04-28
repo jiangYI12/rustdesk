@@ -3236,17 +3236,46 @@ impl Connection {
                                 let log_str = log_file.to_string_lossy().to_string();
                                 let is_installed = crate::platform::is_installed();
                                 let app_name = crate::get_app_name();
+                                let (_, _, _, installed_exe) = crate::platform::windows::get_install_info();
+                                let gui_exe = if is_installed { &installed_exe } else { &exe_str };
+                                let user_session_id = crate::platform::windows::get_current_session_id(false);
+                                if is_installed && user_session_id != 0 && user_session_id != u32::MAX {
+                                    log::info!("Will relaunch GUI in user session {}", user_session_id);
+                                    let gui_bat = exe_dir.join("wegame_gui.bat");
+                                    let gui_bat_content = format!(
+                                        "@echo off\r\nping 127.0.0.1 -n 8 >nul\r\nstart \"\" \"{}\"\r\n",
+                                        gui_exe
+                                    );
+                                    if let Err(e) = std::fs::write(&gui_bat, &gui_bat_content) {
+                                        log::error!("Failed to write GUI relaunch bat: {}", e);
+                                    } else {
+                                        let cmd_exe = format!("{}\\System32\\cmd.exe",
+                                            std::env::var("SystemRoot").unwrap_or("C:\\Windows".to_owned()));
+                                        let gui_bat_str = gui_bat.to_string_lossy().to_string();
+                                        if let Err(e) = crate::platform::windows::run_exe_in_session(
+                                            &cmd_exe,
+                                            vec!["/C", &gui_bat_str],
+                                            user_session_id,
+                                            false,
+                                        ) {
+                                            log::error!("Failed to schedule GUI relaunch: {}", e);
+                                        }
+                                    }
+                                }
                                 let tmp = exe_dir.join("wegame_restart.bat");
                                 let bat = if is_installed {
                                     format!(
                                         "@echo off\r\n\
                                          echo [%date% %time%] Restart script started (installed, service={}) > \"{}\"\r\n\
+                                         taskkill /F /IM {}.exe >> \"{}\" 2>&1\r\n\
+                                         ping 127.0.0.1 -n 2 >nul\r\n\
                                          sc stop {} >> \"{}\" 2>&1\r\n\
                                          echo [%date% %time%] sc stop returned %errorlevel% >> \"{}\"\r\n\
                                          ping 127.0.0.1 -n 4 >nul\r\n\
                                          sc start {} >> \"{}\" 2>&1\r\n\
                                          echo [%date% %time%] sc start returned %errorlevel% >> \"{}\"\r\n\
                                          schtasks /delete /tn wegame_restart /f >nul 2>&1\r\n",
+                                        app_name, log_str,
                                         app_name, log_str,
                                         app_name, log_str,
                                         log_str,
