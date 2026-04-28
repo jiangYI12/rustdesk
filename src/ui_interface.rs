@@ -430,7 +430,7 @@ pub fn set_option(key: String, value: String) {
         }
         #[cfg(target_os = "windows")]
         {
-            if crate::platform::is_installed() {
+            if value == "Y" && crate::platform::is_installed() {
                 let app_name = crate::get_app_name();
                 let exe = std::env::current_exe().unwrap_or_default();
                 let exe_dir = exe.parent().unwrap_or(std::path::Path::new("."));
@@ -472,7 +472,6 @@ pub fn set_option(key: String, value: String) {
                         .creation_flags(0x08000000)
                         .output();
                 }
-                return;
             }
         }
     } else if &key == "audio-input" {
