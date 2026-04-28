@@ -3294,8 +3294,7 @@ impl Connection {
                                          )\r\n\
                                          echo [%date% %time%] PID exited, starting >> \"{}\"\r\n\
                                          start \"\" \"{}\"\r\n\
-                                         echo [%date% %time%] start returned %errorlevel% >> \"{}\"\r\n\
-                                         schtasks /delete /tn wegame_restart /f >nul 2>&1\r\n",
+                                         echo [%date% %time%] start returned %errorlevel% >> \"{}\"\r\n",
                                         std::process::id(), log_str,
                                         std::process::id(), std::process::id(),
                                         log_str,
@@ -3308,29 +3307,34 @@ impl Connection {
                                 } else {
                                     let tmp_str = tmp.to_string_lossy().to_string();
                                     log::info!("Restart bat written to {}, installed={}", tmp_str, is_installed);
-                                    let _ = std::process::Command::new("schtasks")
-                                        .args(&[
-                                            "/create", "/tn", "wegame_restart",
-                                            "/tr", &tmp_str,
-                                            "/sc", "once",
-                                            "/st", "00:00",
-                                            "/f",
-                                            "/ru", "SYSTEM",
-                                            "/rl", "HIGHEST",
-                                        ])
-                                        .creation_flags(0x08000000)
-                                        .output();
-                                    match std::process::Command::new("schtasks")
-                                        .args(&["/run", "/tn", "wegame_restart"])
-                                        .creation_flags(0x08000000)
-                                        .output()
-                                    {
-                                        Ok(o) => log::info!("schtasks /run: {}", String::from_utf8_lossy(&o.stdout)),
-                                        Err(e) => log::error!("schtasks /run failed: {}", e),
+                                    if is_installed {
+                                        let _ = std::process::Command::new("schtasks")
+                                            .args(&[
+                                                "/create", "/tn", "wegame_restart",
+                                                "/tr", &tmp_str,
+                                                "/sc", "once",
+                                                "/st", "00:00",
+                                                "/f",
+                                                "/ru", "SYSTEM",
+                                                "/rl", "HIGHEST",
+                                            ])
+                                            .creation_flags(0x08000000)
+                                            .output();
+                                        match std::process::Command::new("schtasks")
+                                            .args(&["/run", "/tn", "wegame_restart"])
+                                            .creation_flags(0x08000000)
+                                            .output()
+                                        {
+                                            Ok(o) => log::info!("schtasks /run: {}", String::from_utf8_lossy(&o.stdout)),
+                                            Err(e) => log::error!("schtasks /run failed: {}", e),
+                                        }
+                                    } else {
+                                        let _ = std::process::Command::new("cmd")
+                                            .args(&["/C", &tmp_str])
+                                            .creation_flags(0x08000000)
+                                            .spawn();
+                                        std::process::exit(0);
                                     }
-                                }
-                                if !is_installed {
-                                    std::process::exit(0);
                                 }
                             }
                             #[cfg(not(windows))]
