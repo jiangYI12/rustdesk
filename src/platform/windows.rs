@@ -3307,8 +3307,9 @@ fn wait_for_service_state(expected_running: bool, timeout: Duration) -> bool {
 }
 
 fn run_sc_command(verb: &str) -> ResultType<bool> {
+    let app_name = crate::get_app_name();
     Ok(std::process::Command::new("sc.exe")
-        .args([verb, crate::get_app_name()])
+        .args([verb, app_name.as_str()])
         .creation_flags(CREATE_NO_WINDOW)
         .status()?
         .success())
