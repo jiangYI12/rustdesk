@@ -3226,56 +3226,24 @@ impl Connection {
                         #[cfg(not(any(target_os = "android", target_os = "ios")))]
                         {
                             log::info!("Restart RustDesk service by the peer");
-                            let exe = std::env::current_exe().unwrap_or_default();
-                            let exe_str = exe.to_string_lossy().to_string();
                             #[cfg(windows)]
                             {
-                                use std::os::windows::process::CommandExt;
-                                let exe_dir = exe.parent().unwrap_or(std::path::Path::new("."));
-                                let tmp = exe_dir.join("rustdesk_restart.bat");
-                                let log_file = exe_dir.join("restart.log");
-                                let log_str = log_file.to_string_lossy().to_string();
-                                let bat = format!(
-                                    "@echo off\r\n\
-                                     echo [%date% %time%] Restart script started, waiting for PID {} to exit > \"{}\"\r\n\
-                                     :wait\r\n\
-                                     tasklist /FI \"PID eq {}\" 2>nul | find \"{}\" >nul\r\n\
-                                     if not errorlevel 1 (\r\n\
-                                         echo [%date% %time%] PID {} still running, waiting... >> \"{}\"\r\n\
-                                         timeout /t 1 /nobreak >nul\r\n\
-                                         goto wait\r\n\
-                                     )\r\n\
-                                     echo [%date% %time%] PID {} exited, starting \"{}\" >> \"{}\"\r\n\
-                                     start \"\" \"{}\"\r\n\
-                                     if errorlevel 1 (\r\n\
-                                         echo [%date% %time%] ERROR: Failed to start process >> \"{}\"\r\n\
-                                     ) else (\r\n\
-                                         echo [%date% %time%] Process started successfully >> \"{}\"\r\n\
-                                     )\r\n",
-                                    std::process::id(), log_str,
-                                    std::process::id(), std::process::id(),
-                                    std::process::id(), log_str,
-                                    std::process::id(), exe_str, log_str,
-                                    exe_str,
-                                    log_str,
-                                    log_str,
-                                );
-                                if let Err(e) = std::fs::write(&tmp, &bat) {
-                                    log::error!("Failed to write restart bat: {}", e);
-                                } else {
-                                    log::info!("Restart bat written to {:?}", tmp);
-                                    match std::process::Command::new("cmd")
-                                        .args(&["/C", &tmp.to_string_lossy().to_string()])
-                                        .creation_flags(0x08000200)
-                                        .spawn()
-                                    {
-                                        Ok(_) => log::info!("Restart bat spawned"),
-                                        Err(e) => log::error!("Failed to spawn restart bat: {}", e),
+                                match crate::platform::windows::prepare_remote_service_restart() {
+                                    Ok(should_exit) => {
+                                        if should_exit {
+                                            std::process::exit(0);
+                                        }
                                     }
+                                    Err(e) => log::error!(
+                                        "Failed to prepare full RustDesk restart: {}",
+                                        e
+                                    ),
                                 }
                             }
                             #[cfg(not(windows))]
                             {
+                                let exe = std::env::current_exe().unwrap_or_default();
+                                let exe_str = exe.to_string_lossy().to_string();
                                 let cmd_str = format!(
                                     "sleep 3 && \"{}\"",
                                     exe_str
@@ -3283,8 +3251,8 @@ impl Connection {
                                 let _ = std::process::Command::new("sh")
                                     .args(&["-c", &cmd_str])
                                     .spawn();
+                                std::process::exit(0);
                             }
-                            std::process::exit(0);
                         }
                     }
                     #[cfg(windows)]

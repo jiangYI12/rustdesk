@@ -359,6 +359,20 @@ pub fn core_main() -> Option<Vec<String>> {
                 crate::tray::start_tray();
             }
             return None;
+        } else if args[0] == "--restart-remote-service-helper" {
+            #[cfg(windows)]
+            {
+                if args.len() == 2 {
+                    if let Err(err) =
+                        crate::platform::windows::run_remote_service_restart_helper(&args[1])
+                    {
+                        log::error!("Failed to run restart helper: {}", err);
+                    }
+                } else {
+                    log::error!("Missing restart helper plan path");
+                }
+            }
+            return None;
         } else if args[0] == "--install-service" {
             log::info!("start --install-service");
             crate::platform::install_service();

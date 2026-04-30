@@ -3257,6 +3257,205 @@ taskkill /F /IM {app_name}.exe{filter}
     Ok(())
 }
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct RemoteServiceRestartPlan {
+    parent_pid: u32,
+    main_window_sessions: Vec<u32>,
+    tray_sessions: Vec<u32>,
+    service_running: bool,
+    restart_server_directly: bool,
+}
+
+fn dedup_sessions(sessions: &mut Vec<u32>) {
+    sessions.retain(|sid| *sid != 0);
+    sessions.sort_unstable();
+    sessions.dedup();
+}
+
+fn wait_for_process_exit(pid: u32, timeout: Duration) {
+    let started = Instant::now();
+    loop {
+        let mut system = System::new();
+        system.refresh_processes();
+        if system.process(Pid::from_u32(pid)).is_none() {
+            break;
+        }
+        if started.elapsed() >= timeout {
+            log::warn!("Timed out waiting for process {} to exit", pid);
+            break;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+fn wait_for_service_state(expected_running: bool, timeout: Duration) -> bool {
+    let started = Instant::now();
+    loop {
+        if is_self_service_running() == expected_running {
+            return true;
+        }
+        if started.elapsed() >= timeout {
+            log::warn!(
+                "Timed out waiting for service state {}, current={}",
+                expected_running,
+                is_self_service_running()
+            );
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}
+
+fn run_sc_command(verb: &str) -> ResultType<bool> {
+    Ok(std::process::Command::new("sc.exe")
+        .args([verb, crate::get_app_name()])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status()?
+        .success())
+}
+
+fn kill_other_rustdesk_processes(excluded_pids: &[u32]) {
+    let mut current_exe = match std::env::current_exe() {
+        Ok(path) => path,
+        Err(err) => {
+            log::warn!("Failed to get current exe when cleaning processes: {}", err);
+            return;
+        }
+    };
+    if let Ok(linked) = current_exe.read_link() {
+        current_exe = linked;
+    }
+    let current_exe = current_exe.to_string_lossy().to_lowercase();
+    let excluded_pids = excluded_pids
+        .iter()
+        .copied()
+        .collect::<std::collections::HashSet<_>>();
+
+    let system = System::new_all();
+    for (pid, process) in system.processes() {
+        let pid = pid.as_u32();
+        if excluded_pids.contains(&pid) {
+            continue;
+        }
+        let mut process_exe = process.exe().to_path_buf();
+        if let Ok(linked) = process_exe.read_link() {
+            process_exe = linked;
+        }
+        if process_exe.to_string_lossy().to_lowercase() != current_exe {
+            continue;
+        }
+        if !process.kill() {
+            log::warn!("Failed to kill leftover RustDesk process pid={}", pid);
+        }
+    }
+}
+
+fn restore_processes_for_sessions(exe: &str, args: &[&str], sessions: &[u32], show: bool) {
+    let is_root = is_root();
+    let mut spawned_non_root = false;
+    for session_id in sessions.iter().copied() {
+        if is_root {
+            allow_err!(run_exe_in_session(exe, args.to_vec(), session_id, show));
+        } else if !spawned_non_root {
+            allow_err!(run_exe_direct(exe, args.to_vec(), show));
+            spawned_non_root = true;
+        }
+    }
+}
+
+pub fn prepare_remote_service_restart() -> ResultType<bool> {
+    let current_exe = std::env::current_exe()?;
+    let app_exe_name = format!("{}.exe", crate::get_app_name());
+    let self_pid = Pid::from_u32(std::process::id());
+    let service_running = is_self_service_running();
+
+    let mut main_window_pids =
+        crate::platform::get_pids_of_process_with_args::<_, &str>(&app_exe_name, &[]);
+    let mut tray_pids = crate::platform::get_pids_of_process_with_args(&app_exe_name, &["--tray"]);
+
+    let mut main_window_sessions = main_window_pids
+        .iter()
+        .filter_map(|pid| get_session_id_of_process(pid.as_u32()))
+        .collect::<Vec<_>>();
+    let mut tray_sessions = tray_pids
+        .iter()
+        .filter_map(|pid| get_session_id_of_process(pid.as_u32()))
+        .collect::<Vec<_>>();
+    dedup_sessions(&mut main_window_sessions);
+    dedup_sessions(&mut tray_sessions);
+
+    main_window_pids.retain(|pid| *pid != self_pid);
+    tray_pids.retain(|pid| *pid != self_pid);
+
+    let plan = RemoteServiceRestartPlan {
+        parent_pid: std::process::id(),
+        main_window_sessions: main_window_sessions.clone(),
+        tray_sessions: tray_sessions.clone(),
+        service_running,
+        restart_server_directly: !service_running,
+    };
+
+    let mut plan_path = std::env::temp_dir();
+    plan_path.push(format!(
+        "rustdesk-remote-restart-{}.json",
+        std::process::id()
+    ));
+    std::fs::write(&plan_path, serde_json::to_vec(&plan)?)?;
+
+    std::process::Command::new(&current_exe)
+        .arg("--restart-remote-service-helper")
+        .arg(&plan_path)
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()?;
+
+    if !main_window_pids.is_empty() {
+        allow_err!(kill_process_by_pids(&app_exe_name, main_window_pids));
+    }
+    if !tray_pids.is_empty() {
+        allow_err!(kill_process_by_pids(&app_exe_name, tray_pids));
+    }
+
+    Ok(!service_running)
+}
+
+pub fn run_remote_service_restart_helper(plan_path: &str) -> ResultType<()> {
+    let plan_path = PathBuf::from(plan_path);
+    let plan: RemoteServiceRestartPlan = serde_json::from_slice(&std::fs::read(&plan_path)?)?;
+    let exe = std::env::current_exe()?.to_string_lossy().to_string();
+
+    if plan.service_running {
+        if !run_sc_command("stop")? {
+            log::warn!("Failed to stop RustDesk service via sc.exe");
+        }
+        wait_for_process_exit(plan.parent_pid, Duration::from_secs(20));
+        wait_for_service_state(false, Duration::from_secs(20));
+    } else {
+        wait_for_process_exit(plan.parent_pid, Duration::from_secs(15));
+    }
+
+    kill_other_rustdesk_processes(&[std::process::id()]);
+
+    if plan.service_running {
+        if !run_sc_command("start")? {
+            log::warn!("Failed to start RustDesk service via sc.exe");
+        }
+        wait_for_service_state(true, Duration::from_secs(20));
+        std::thread::sleep(Duration::from_millis(1500));
+    } else if plan.restart_server_directly {
+        allow_err!(run_exe_direct(&exe, vec!["--server"], false));
+        std::thread::sleep(Duration::from_millis(1200));
+    }
+
+    restore_processes_for_sessions(&exe, &["--tray"], &plan.tray_sessions, true);
+    if !plan.main_window_sessions.is_empty() {
+        std::thread::sleep(Duration::from_millis(1200));
+    }
+    restore_processes_for_sessions(&exe, &[], &plan.main_window_sessions, true);
+
+    std::fs::remove_file(&plan_path).ok();
+    Ok(())
+}
+
 fn get_reg_msi_key(subkey: &str, is_msi: Option<bool>) -> Option<String> {
     // Only proceed if it's a custom client and MSI is installed.
     // `is_msi.unwrap_or(true)` is intentional: subsequent code validates the registry,
